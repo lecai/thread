@@ -3,8 +3,11 @@
 //
 
 
+#include <signal.h>
 #include "thread.h"
-#include "mythread.h"
+#include <pthread.h>
+#include "algorithm"
+#include <unistd.h>
 
 namespace thread{
     //linux 和 mac 版本
@@ -81,7 +84,7 @@ namespace thread{
         m_Mutex.lock();
     }
 
-    Mutex_scope_lock::~Mutex_scope_lock(Mutex &m) {
+    Mutex_scope_lock::~Mutex_scope_lock() {
         m_Mutex.unlock();
     }
 
@@ -92,7 +95,7 @@ namespace thread{
         m_RwLock.rdlock();
     }
 
-    RWLock_scope_rdlock::~RWLock_scope_rdlock(RWLock &m) {
+    RWLock_scope_rdlock::~RWLock_scope_rdlock() {
         m_RwLock.unlock();
     }
 
@@ -103,7 +106,7 @@ namespace thread{
         m_RwLock.wrlock();
     }
 
-    RWLock_scope_wrlock::~RWLock_scope_wrlock(RWLock &m) {
+    RWLock_scope_wrlock::~RWLock_scope_wrlock() {
         m_RwLock.unlock();
     }
 
@@ -165,11 +168,147 @@ void* Thread::threadFunc(void *arg) {
 
     thread->m_Lock.lock();
     thread->alive = true;
-    thread->cond.broadcast();
+    thread->m_Cond.broadcast();
     thread->m_Lock.unlock();
 
+    //设置线程信号处理句柄
+    sigset_t sig_mask;
+    sigfillset(&sig_mask);
+    pthread_sigmask(SIG_SETMASK, &sig_mask, NULL);
 
+    //运行线程的主回调函数
+    thread->run();
+
+    thread->m_Lock.lock();
+    thread->alive = false;
+    thread->m_Cond.broadcast();
+    thread->m_Lock.unlock();
+
+    //如何是非joinable 需要回收线程资源
+    if(!thread->isJoinable())
+    {
+        thread->m_Lock.lock();
+        while (thread->alive)
+            thread->m_Cond.wait(thread->m_Lock);
+        thread->m_Lock.unlock();
+        delete (thread);
+    }
+    pthread_exit(NULL);
 }
+
+    /*
+     *创建线程 启动线程
+     * @return 线程启动是否成功
+     */
+    bool Thread::start() {
+        //线程已经创建,直接返回
+        if(alive)
+        {
+            return true;
+        }
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+        if(!joinable) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+        if(0 != pthread_create(&m_hThread, &attr, threadFunc, this))
+        {
+            return false;
+        }
+        pthread_attr_destroy(&attr);
+
+        m_Lock.lock();
+        while (!alive)
+            m_Cond.wait(m_Lock);
+        m_Lock.unlock();
+        return true;
+    }
+
+    /*
+     *等待一个线程结束
+     */
+    void Thread::join() {
+        if(0 != m_hThread && joinable)
+        {
+             ::pthread_join(m_hThread, NULL);
+             m_hThread = 0;
+             m_Lock.lock();
+            while (alive)
+                m_Cond.wait(m_Lock);
+            m_Lock.unlock();
+        }
+    }
+
+    /***
+    * ThreadGroup
+    */
+    ThreadGroup::ThreadGroup() :m_Cts(),m_hRWLock(){
+
+    }
+
+    ThreadGroup::~ThreadGroup() {
+        joinAll();
+    }
+
+    /*
+     * 添加一个线程到池中
+     * @param thread 待添加的线程
+     */
+    void ThreadGroup::add(Thread *thread) {
+        RWLock_scope_wrlock scope_wrlock(m_hRWLock);
+        Container::iterator it = std::find(m_Cts.begin(), m_Cts.end(), thread);
+        if(it == m_Cts.end())
+            m_Cts.push_back(thread);
+    }
+
+    Thread* ThreadGroup::getByIndex(Container::size_type index) {
+        RWLock_scope_rdlock scope_rdlock(m_hRWLock);
+        if (index > m_Cts.size())
+        {
+            return NULL;
+        } else
+        {
+            return m_Cts[index];
+        }
+    }
+
+    Thread* ThreadGroup::operator [](Container::size_type index) {
+        RWLock_scope_rdlock scope_rdlock(m_hRWLock);
+        if (index > m_Cts.size())
+        {
+            return NULL;
+        } else
+        {
+            return m_Cts[index];
+        }
+    }
+    /*
+      * 等待所有线程结束
+      */
+    void ThreadGroup::joinAll() {
+        RWLock_scope_wrlock scope_wrlock(m_hRWLock);
+        while (!m_Cts.empty())
+        {
+            Thread *thread = m_Cts.back();
+            m_Cts.pop_back();
+            if(thread)
+            {
+                thread->final();
+                thread->join();
+                delete (thread);
+            }
+        }
+    }
+
+    void ThreadGroup::execAll(stCallback &cb) {
+        RWLock_scope_rdlock scope_rdlock(m_hRWLock);
+        for(Container::iterator it = m_Cts.begin(); it != m_Cts.end(); ++it)
+        {
+            cb.exec(*it);
+        }
+    }
+
+
+
+
 
 
 

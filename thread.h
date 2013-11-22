@@ -77,7 +77,7 @@ public:
      * 对锁进行unlock操作
      * @param m 锁引用
      */
-    ~Mutex_scope_lock(Mutex &m);
+    ~Mutex_scope_lock();
 
     Mutex &m_Mutex; //锁对象
 };
@@ -133,7 +133,7 @@ public:
      * 析构函数
      * 对读写锁进行 unlock 操作
      */
-    ~RWLock_scope_rdlock(RWLock &m);
+    ~RWLock_scope_rdlock();
 
 private:
     RWLock &m_RwLock; //读写锁引用
@@ -153,7 +153,7 @@ public:
      * 析构函数
      * 对读写锁进行 unlock 操作
      */
-    ~RWLock_scope_wrlock(RWLock &m);
+    ~RWLock_scope_wrlock();
 private:
     RWLock &m_RwLock; //读写锁引用
 
@@ -244,7 +244,7 @@ public:
     static void *threadFunc(void *arg);
 
     bool start();
-    bool join();
+    void join();
 
     /*
      * 主动结束线程
