@@ -278,32 +278,5 @@ public:
     Cond m_Cond;
 };
 
-class ThreadGroup{
-public:
-    struct stCallback{
-        virtual void *exec(Thread *e) = 0;
-        virtual ~stCallback();
-    };
-
-    typedef std::vector<Thread*> Container ; //容器类型
-
-    ThreadGroup();
-    ~ThreadGroup();
-    void add(Thread *thread);
-    Thread *getByIndex(Container::size_type index);
-    Thread *operator[] (Container::size_type index);
-    void joinAll();
-    void execAll(stCallback &cb);
-
-    const Container::size_type size()
-    {
-         RWLock_scope_rdlock scope_rdlock(m_hRWLock);
-        return m_Cts.size();
-    }
-
-private:
-    Container m_Cts;
-    RWLock m_hRWLock;
-};
 }
 #endif //__thread_H_
