@@ -42,6 +42,11 @@ namespace net{
         {
             return offset == contentSize;
         }
+        /* 接收
+         * @param buffer
+         * @param len
+         * @return len
+         */
         unsigned int recv(void *buffer,unsigned int len)
         {
             if(empty()) return 0;
@@ -50,6 +55,21 @@ namespace net{
             offset+=len;
             return len;
         }
+        /*发送完全
+         * @param T con
+         * @return bool true 发送完全 false 发送失败
+         */
+        template <class CONNECTION>
+        bool sendOver(CONNECTION *con)
+        {
+            unsigned int leftSize = leftSize();
+            if(leftSize == 0) return true;
+            int sendLen = con->send(contents + offset,leftSize);
+            offset += leftSize;
+            if(sendLen < leftSize) return false;
+            return true;
+        }
+
         /*
          * 读取后剩下长度
          */
