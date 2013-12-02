@@ -83,6 +83,26 @@ namespace net{
         unsigned char *contents;
     };
 
+    /*
+     * 线程安全的 消息队列
+     */
+    /*
+     * @brief 单向链表
+     */
+    template <typename CLASS>
+    class Node{
+    public:
+        CLASS node;
+        Node<CLASS> *next;
+        Node()
+        {
+            next = NULL;
+        }
+    };
+
+
+
+
 
 }
 class mac_net {
