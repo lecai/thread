@@ -11,7 +11,7 @@
 class ListenerThread; //监听线程
 class RecycleThread;  //回收线程
 class WorkThread;     //工作线程
-class epollpool {
+class EpollThreadConnectionPoll {
 
 };
 
